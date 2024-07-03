@@ -3,8 +3,8 @@ from typing import Any, Optional, List
 import insightface
 import numpy
 
-import facefusion.globals
-from facefusion.typing import Frame, Face, FaceAnalyserDirection, FaceAnalyserAge, FaceAnalyserGender
+import faceswapper.globals
+from faceswapper.typing import Frame, Face, FaceAnalyserDirection, FaceAnalyserAge, FaceAnalyserGender
 
 FACE_ANALYSER = None
 THREAD_LOCK = threading.Lock()
@@ -15,7 +15,7 @@ def get_face_analyser() -> Any:
 
 	with THREAD_LOCK:
 		if FACE_ANALYSER is None:
-			FACE_ANALYSER = insightface.app.FaceAnalysis(name = 'buffalo_l', providers = facefusion.globals.execution_providers)
+			FACE_ANALYSER = insightface.app.FaceAnalysis(name = 'buffalo_l', providers = faceswapper.globals.execution_providers)
 			FACE_ANALYSER.prepare(ctx_id = 0)
 	return FACE_ANALYSER
 
@@ -39,12 +39,12 @@ def get_one_face(frame : Frame, position : int = 0) -> Optional[Face]:
 def get_many_faces(frame : Frame) -> List[Face]:
 	try:
 		faces = get_face_analyser().get(frame)
-		if facefusion.globals.face_analyser_direction:
-			faces = sort_by_direction(faces, facefusion.globals.face_analyser_direction)
-		if facefusion.globals.face_analyser_age:
-			faces = filter_by_age(faces, facefusion.globals.face_analyser_age)
-		if facefusion.globals.face_analyser_gender:
-			faces = filter_by_gender(faces, facefusion.globals.face_analyser_gender)
+		if faceswapper.globals.face_analyser_direction:
+			faces = sort_by_direction(faces, faceswapper.globals.face_analyser_direction)
+		if faceswapper.globals.face_analyser_age:
+			faces = filter_by_age(faces, faceswapper.globals.face_analyser_age)
+		if faceswapper.globals.face_analyser_gender:
+			faces = filter_by_gender(faces, faceswapper.globals.face_analyser_gender)
 		return faces
 	except (AttributeError, ValueError):
 		return []
