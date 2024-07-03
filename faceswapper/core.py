@@ -119,3 +119,116 @@ def limit_resources() -> None:
 
 def update_status(message : str, scope : str = 'FACEFUSION.CORE') -> None:
 	print('[' + scope + '] ' + message)
+
+
+def pre_check() -> bool:
+	if sys.version_info < (3, 10):
+		update_status(wording.get('python_not_supported').format(version = '3.10'))
+		return False
+	if not shutil.which('ffmpeg'):
+		update_status(wording.get('ffmpeg_not_installed'))
+		return False
+	return True
+
+
+def process_image() -> None:
+	if predict_image(facefusion.globals.target_path):
+		return
+	shutil.copy2(facefusion.globals.target_path, facefusion.globals.output_path)
+	# process frame
+	for frame_processor_module in get_frame_processors_modules(facefusion.globals.frame_processors):
+		update_status(wording.get('processing'), frame_processor_module.NAME)
+		frame_processor_module.process_image(facefusion.globals.source_path, facefusion.globals.output_path, facefusion.globals.output_path)
+		frame_processor_module.post_process()
+	# validate image
+	if is_image(facefusion.globals.target_path):
+		update_status(wording.get('processing_image_succeed'))
+	else:
+		update_status(wording.get('processing_image_failed'))
+
+
+def process_video() -> None:
+	if predict_video(facefusion.globals.target_path):
+		return
+	update_status(wording.get('creating_temp'))
+	create_temp(facefusion.globals.target_path)
+	# extract frames
+	if facefusion.globals.keep_fps:
+		fps = detect_fps(facefusion.globals.target_path)
+		update_status(wording.get('extracting_frames_fps').format(fps = fps))
+		extract_frames(facefusion.globals.target_path, fps)
+	else:
+		update_status(wording.get('extracting_frames_fps').format(fps = 30))
+		extract_frames(facefusion.globals.target_path)
+	# process frame
+	temp_frame_paths = get_temp_frame_paths(facefusion.globals.target_path)
+	if temp_frame_paths:
+		for frame_processor_module in get_frame_processors_modules(facefusion.globals.frame_processors):
+			update_status(wording.get('processing'), frame_processor_module.NAME)
+			frame_processor_module.process_video(facefusion.globals.source_path, temp_frame_paths)
+			frame_processor_module.post_process()
+	else:
+		update_status(wording.get('temp_frames_not_found'))
+		return
+	# create video
+	if facefusion.globals.keep_fps:
+		fps = detect_fps(facefusion.globals.target_path)
+		update_status(wording.get('creating_video_fps').format(fps = fps))
+		if not create_video(facefusion.globals.target_path, fps):
+			update_status(wording.get('creating_video_failed'))
+	else:
+		update_status(wording.get('creating_video_fps').format(fps = 30))
+		if not create_video(facefusion.globals.target_path):
+			update_status(wording.get('creating_video_failed'))
+	# handle audio
+	if facefusion.globals.skip_audio:
+		move_temp(facefusion.globals.target_path, facefusion.globals.output_path)
+		update_status(wording.get('skipping_audio'))
+	else:
+		if facefusion.globals.keep_fps:
+			update_status(wording.get('restoring_audio'))
+		else:
+			update_status(wording.get('restoring_audio_issues'))
+		restore_audio(facefusion.globals.target_path, facefusion.globals.output_path)
+	# clean temp
+	update_status(wording.get('cleaning_temp'))
+	clean_temp(facefusion.globals.target_path)
+	# validate video
+	if is_video(facefusion.globals.target_path):
+		update_status(wording.get('processing_video_succeed'))
+	else:
+		update_status(wording.get('processing_video_failed'))
+
+
+def conditional_process() -> None:
+	for frame_processor_module in get_frame_processors_modules(facefusion.globals.frame_processors):
+		if not frame_processor_module.pre_process():
+			return
+	if is_image(facefusion.globals.target_path):
+		process_image()
+	if is_video(facefusion.globals.target_path):
+		process_video()
+
+
+def run() -> None:
+	parse_args()
+	limit_resources()
+	# pre check
+	if not pre_check():
+		return
+	for frame_processor in get_frame_processors_modules(facefusion.globals.frame_processors):
+		if not frame_processor.pre_check():
+			return
+	# process or launch
+	if facefusion.globals.headless:
+		conditional_process()
+	else:
+		import facefusion.uis.core as ui
+
+		ui.launch()
+
+
+def destroy() -> None:
+	if facefusion.globals.target_path:
+		clean_temp(facefusion.globals.target_path)
+	sys.exit()
