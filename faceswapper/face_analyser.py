@@ -60,3 +60,47 @@ def find_similar_faces(frame : Frame, reference_face : Face, face_distance : flo
 				if current_face_distance < face_distance:
 					similar_faces.append(face)
 	return similar_faces
+
+
+def sort_by_direction(faces : List[Face], direction : FaceAnalyserDirection) -> List[Face]:
+	if direction == 'left-right':
+		return sorted(faces, key = lambda face: face['bbox'][0])
+	if direction == 'right-left':
+		return sorted(faces, key = lambda face: face['bbox'][0], reverse = True)
+	if direction == 'top-bottom':
+		return sorted(faces, key = lambda face: face['bbox'][1])
+	if direction == 'bottom-top':
+		return sorted(faces, key = lambda face: face['bbox'][1], reverse = True)
+	if direction == 'small-large':
+		return sorted(faces, key = lambda face: (face['bbox'][2] - face['bbox'][0]) * (face['bbox'][3] - face['bbox'][1]))
+	if direction == 'large-small':
+		return sorted(faces, key = lambda face: (face['bbox'][2] - face['bbox'][0]) * (face['bbox'][3] - face['bbox'][1]), reverse = True)
+	return faces
+
+
+def filter_by_age(faces : List[Face], age : FaceAnalyserAge) -> List[Face]:
+	filter_faces = []
+	for face in faces:
+		if face['age'] < 13 and age == 'child':
+			filter_faces.append(face)
+		elif face['age'] < 19 and age == 'teen':
+			filter_faces.append(face)
+		elif face['age'] < 60 and age == 'adult':
+			filter_faces.append(face)
+		elif face['age'] > 59 and age == 'senior':
+			filter_faces.append(face)
+	return filter_faces
+
+
+def filter_by_gender(faces : List[Face], gender : FaceAnalyserGender) -> List[Face]:
+	filter_faces = []
+	for face in faces:
+		if face['gender'] == 1 and gender == 'male':
+			filter_faces.append(face)
+		if face['gender'] == 0 and gender == 'female':
+			filter_faces.append(face)
+	return filter_faces
+
+
+def get_faces_total(frame : Frame) -> int:
+	return len(get_many_faces(frame))
