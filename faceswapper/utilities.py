@@ -72,3 +72,111 @@ def create_video(target_path : str, fps : float = 30) -> bool:
 		commands.extend([ '-cq', str(output_video_quality) ])
 	commands.extend([ '-pix_fmt', 'yuv420p', '-vf', 'colorspace=bt709:iall=bt601-6-625', '-y', temp_output_path ])
 	return run_ffmpeg(commands)
+
+    def restore_audio(target_path : str, output_path : str) -> None:
+	trim_frame_start = faceswapper.globals.trim_frame_start
+	trim_frame_end = faceswapper.globals.trim_frame_end
+	temp_output_path = get_temp_output_path(target_path)
+	commands = [ '-hwaccel', 'auto', '-i', temp_output_path, '-i', target_path ]
+	if trim_frame_start is not None and trim_frame_end is not None:
+		commands.extend([ '-filter:v', 'select=between(n,' + str(trim_frame_start) + ',' + str(trim_frame_end) + ')' ])
+	elif trim_frame_start is not None:
+		commands.extend([ '-filter:v', 'select=gt(n,' + str(trim_frame_start) + ')' ])
+	elif trim_frame_end is not None:
+		commands.extend([ '-filter:v', 'select=lt(n,' + str(trim_frame_end) + ')' ])
+	commands.extend([ '-c:a', 'copy', '-map', '0:v:0', '-map', '1:a:0', '-y', output_path ])
+	done = run_ffmpeg(commands)
+	if not done:
+		move_temp(target_path, output_path)
+
+
+def get_temp_frame_paths(target_path : str) -> List[str]:
+	temp_directory_path = get_temp_directory_path(target_path)
+	return glob.glob((os.path.join(glob.escape(temp_directory_path), '*.' + faceswapper.globals.temp_frame_format)))
+
+
+def get_temp_directory_path(target_path : str) -> str:
+	target_name, _ = os.path.splitext(os.path.basename(target_path))
+	target_directory_path = os.path.dirname(target_path)
+	return os.path.join(target_directory_path, TEMP_DIRECTORY, target_name)
+
+
+def get_temp_output_path(target_path : str) -> str:
+	temp_directory_path = get_temp_directory_path(target_path)
+	return os.path.join(temp_directory_path, TEMP_VIDEO_FILE)
+
+
+def normalize_output_path(source_path : str, target_path : str, output_path : str) -> Optional[str]:
+	if source_path and target_path and output_path:
+		source_name, _ = os.path.splitext(os.path.basename(source_path))
+		target_name, target_extension = os.path.splitext(os.path.basename(target_path))
+		if os.path.isdir(output_path):
+			return os.path.join(output_path, source_name + '-' + target_name + target_extension)
+	return output_path
+
+
+def create_temp(target_path : str) -> None:
+	temp_directory_path = get_temp_directory_path(target_path)
+	Path(temp_directory_path).mkdir(parents = True, exist_ok = True)
+
+
+def move_temp(target_path : str, output_path : str) -> None:
+	temp_output_path = get_temp_output_path(target_path)
+	if os.path.isfile(temp_output_path):
+		if os.path.isfile(output_path):
+			os.remove(output_path)
+		shutil.move(temp_output_path, output_path)
+
+
+def clean_temp(target_path : str) -> None:
+	temp_directory_path = get_temp_directory_path(target_path)
+	parent_directory_path = os.path.dirname(temp_directory_path)
+	if not faceswapper.globals.keep_temp and os.path.isdir(temp_directory_path):
+		shutil.rmtree(temp_directory_path)
+	if os.path.exists(parent_directory_path) and not os.listdir(parent_directory_path):
+		os.rmdir(parent_directory_path)
+
+
+def is_image(image_path : str) -> bool:
+	if image_path and os.path.isfile(image_path):
+		mimetype, _ = mimetypes.guess_type(image_path)
+		return bool(mimetype and mimetype.startswith('image/'))
+	return False
+
+
+def is_video(video_path : str) -> bool:
+	if video_path and os.path.isfile(video_path):
+		mimetype, _ = mimetypes.guess_type(video_path)
+		return bool(mimetype and mimetype.startswith('video/'))
+	return False
+
+
+def conditional_download(download_directory_path : str, urls : List[str]) -> None:
+	if not os.path.exists(download_directory_path):
+		os.makedirs(download_directory_path)
+	for url in urls:
+		download_file_path = os.path.join(download_directory_path, os.path.basename(url))
+		if not os.path.exists(download_file_path):
+			request = urllib.request.urlopen(url) # type: ignore[attr-defined]
+			total = int(request.headers.get('Content-Length', 0))
+			with tqdm(total = total, desc = wording.get('downloading'), unit = 'B', unit_scale = True, unit_divisor = 1024) as progress:
+				urllib.request.urlretrieve(url, download_file_path, reporthook = lambda count, block_size, total_size: progress.update(block_size)) # type: ignore[attr-defined]
+
+
+def resolve_relative_path(path : str) -> str:
+	return os.path.abspath(os.path.join(os.path.dirname(__file__), path))
+
+
+def list_module_names(path : str) -> Optional[List[str]]:
+	if os.path.exists(path):
+		files = os.listdir(path)
+		return [Path(file).stem for file in files if not Path(file).stem.startswith('__')]
+	return None
+
+
+def encode_execution_providers(execution_providers : List[str]) -> List[str]:
+	return [execution_provider.replace('ExecutionProvider', '').lower() for execution_provider in execution_providers]
+
+
+def decode_execution_providers(execution_providers : List[str]) -> List[str]:
+	return [provider for provider, encoded_execution_provider in zip(onnxruntime.get_available_providers(), encode_execution_providers(onnxruntime.get_available_providers())) if any(execution_provider in encoded_execution_provider for execution_provider in execution_providers)]
