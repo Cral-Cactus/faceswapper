@@ -3,12 +3,12 @@ from typing import Any, Dict, Tuple, Optional
 
 import gradio
 
-import facefusion.globals
-from facefusion import wording
-from facefusion.capturer import get_video_frame_total
-from facefusion.uis import core as ui
-from facefusion.uis.typing import Update
-from facefusion.utilities import is_video
+import faceswapper.globals
+from faceswapper import wording
+from faceswapper.capturer import get_video_frame_total
+from faceswapper.uis import core as ui
+from faceswapper.uis.typing import Update
+from faceswapper.utilities import is_video
 
 TRIM_FRAME_START_SLIDER : Optional[gradio.Slider] = None
 TRIM_FRAME_END_SLIDER : Optional[gradio.Slider] = None
@@ -21,18 +21,18 @@ def render() -> None:
 	with gradio.Box():
 		trim_frame_start_slider_args : Dict[str, Any] = {
 			'label': wording.get('trim_frame_start_slider_label'),
-			'value': facefusion.globals.trim_frame_start,
+			'value': faceswapper.globals.trim_frame_start,
 			'step': 1,
 			'visible': False
 		}
 		trim_frame_end_slider_args : Dict[str, Any] = {
 			'label': wording.get('trim_frame_end_slider_label'),
-			'value': facefusion.globals.trim_frame_end,
+			'value': faceswapper.globals.trim_frame_end,
 			'step': 1,
 			'visible': False
 		}
-		if is_video(facefusion.globals.target_path):
-			video_frame_total = get_video_frame_total(facefusion.globals.target_path)
+		if is_video(faceswapper.globals.target_path):
+			video_frame_total = get_video_frame_total(faceswapper.globals.target_path)
 			trim_frame_start_slider_args['maximum'] = video_frame_total
 			trim_frame_start_slider_args['visible'] = True
 			trim_frame_end_slider_args['value'] = video_frame_total
@@ -53,14 +53,14 @@ def listen() -> None:
 
 def remote_update() -> Tuple[Update, Update]:
 	sleep(0.1)
-	if is_video(facefusion.globals.target_path):
-		video_frame_total = get_video_frame_total(facefusion.globals.target_path)
-		facefusion.globals.trim_frame_start = 0
-		facefusion.globals.trim_frame_end = video_frame_total
+	if is_video(faceswapper.globals.target_path):
+		video_frame_total = get_video_frame_total(faceswapper.globals.target_path)
+		faceswapper.globals.trim_frame_start = 0
+		faceswapper.globals.trim_frame_end = video_frame_total
 		return gradio.update(value = 0, maximum = video_frame_total, visible = True), gradio.update(value = video_frame_total, maximum = video_frame_total, visible = True)
 	return gradio.update(value = None, maximum = None, visible = False), gradio.update(value = None, maximum = None, visible = False)
 
 
 def update_number(name : str, value : int) -> Update:
-	setattr(facefusion.globals, name, value)
+	setattr(faceswapper.globals, name, value)
 	return gradio.update(value = value)
