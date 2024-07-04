@@ -14,7 +14,7 @@ from faceswapper.utilities import conditional_download, resolve_relative_path, i
 FRAME_PROCESSOR = None
 THREAD_SEMAPHORE = threading.Semaphore()
 THREAD_LOCK = threading.Lock()
-NAME = 'faceswapper.FRAME_PROCESSOR.FACE_ENHANCER'
+NAME = 'FACESWAPPER.FRAME_PROCESSOR.FACE_ENHANCER'
 
 
 def get_frame_processor() -> Any:
